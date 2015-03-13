@@ -1,0 +1,8 @@
+#header {
+    background: url('../resources/img/header.gif') no-repeat center center;
+    background-size: 100%;
+}
+
+#button-style {
+    float: right;
+}
