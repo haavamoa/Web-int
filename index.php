@@ -16,11 +16,36 @@ require_once("backend/pille_search.php");
         </div>
     <button type="button" class="btn btn-success" id="button-style">Export to JSON</button>
         <div class="container-fluid">
-            <label>Search: </label> 
+            <label>Søkefelt: </label> 
           <form name="medicaldrug_search" method="POST" action="">
     <input type="text" name="medical_drugs" placeholder="Leggemiddel" 
     value="<?php echo $_POST['medical_drugs']; ?>" size=50/>
-          <input type="submit" value="Søk"  name="search_btn"/>
+    <input type="submit" value="Søk"  name="search_btn"/>     
+    <font color="red"> <?php 
+
+
+
+$invalid_drug ="";
+foreach($invalid_drugs as $drug){
+
+if($drug == $invalid_drugs[0]){
+$invalid_drug = $drug;
+}elseif(end($invalid_drugs)==$drug){
+            $invalid_drug = $invalid_drug." og ".$drug;
+        }else{
+            $invalid_drug = $invalid_drug.", ".$drug;
+}
+}
+echo $invalid_drug." finnes ikke!";
+
+
+?>
+</font>
+</br>
+    <input type="radio" name="view" value="full" <?php if($_POST["view"] == "full") echo 'checked = "checked"'; elseif($_POST["view"] == "") echo 'checked = "checked"';?>> Full informasjon</input>
+</br>
+<input type="radio" name="view" value="overlapp_bi" <?php if($_POST["view"] == "overlapp_bi") echo 'checked="checked"' ?> >Overlappende bivirkninger</input>
+
           </form>
 
             <p></p>
