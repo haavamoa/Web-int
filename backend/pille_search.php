@@ -1,17 +1,18 @@
 <?php
 require("pille_query.php");
+require("pille_buildtables.php");
+
 
 /** A initiation if drugs are available or not, this will only init if there is drugs in the search textbox and will show up as a red text over the tables of drugs **/
 $invalid_drugs = array();
 if(isset($_POST["medical_drugs"])){
     //Check if the medics you are searching for are available
-    $medical_drugs_post = $_POST["medical_drugs"];
-    if(strlen($medical_drugs_post)>0){
-        $medical_drugs = split(",",$medical_drugs_post);
+    //Remove duplicates
+    $medical_drugs = getMedicalDrugsFromSearchBar();
+    if(count($medical_drugs)>0){        
         foreach($medical_drugs as $medical_drug){
-            
             $active_ingredients = getActiveIngredients($medical_drug,new pille_query());
-            if(count($active_ingredients)==0){ //Check if the medical drug exists
+            if(count($active_ingredients[1])==0){ //Check if the medical drug exists
                 array_push($invalid_drugs,$medical_drug);
                 
     }
@@ -19,177 +20,254 @@ if(isset($_POST["medical_drugs"])){
     }
 }
 
+function getMedicalDrugsFromSearchBar(){
+    if(isset($_POST["medical_drugs"])){
+        $medical_drugs_split = split(",",$_POST["medical_drugs"]);
+        //Trim whitespace
+        $result = array_map('trim',$medical_drugs_split);
+        //Remove duplicates
+        $result = array_unique($result);
+        return $result;
+    }
+}
+
 /*Check if you have pressed search and if the input is valid*/
-function createMedicalViz(){
+function createMedicalViz($medical_drugs){
     /**
        :: Different views ::
        full = full information
        overlapp_bi = overlapping adverse effects
     */
     $view = $_POST["view"];
-    if(isset($_POST["medical_drugs"])){
-        $medical_drugs = split(",",$_POST["medical_drugs"]);
         if($view == "full"){
             createFullInformation($medical_drugs,new pille_query());
         }elseif($view == "overlapp_bi"){
             createOverLappingAdverseEffect($medical_drugs,new pille_query());
+        }elseif($view == "overlapp_virk"){
+            createOverLappingActiveIngredients($medical_drugs,new pille_query());
+        }elseif($view == "counteracting_effects"){
+            createCounteractingEffects($medical_drugs,new pille_query());
         }
-        
-    }
 }
  
 function createFullInformation($medical_drugs,$sparql){
     $medical_drugs_not_found = array();
     foreach($medical_drugs as $medical_drug){
         //Active Ingredients
-        $active_ingredients = getActiveIngredients($medical_drug,new pille_query());
-        if(!count($active_ingredients)==0){ //Check if the medical drug exists 
+        $active_ingredients = getActiveIngredients($medical_drug,$sparql);
+        if(!count($active_ingredients[1])==0){ //Check if the medical drug exists 
         //Adverse Effects
         $adverse_effects = getAdverseEffects($medical_drug,$sparql);
         //Indications
         $indications = getIndications($medical_drug,$sparql);
+        //Dosages
+        $dosage = getDosages($medical_drug,$sparql);
+        /* Create Export to JSON form */
+        $queries = [$active_ingredients[0],$adverse_effects[0],$indications[0]];
+        createExportJSONButton($queries);
         /* Create the table*/
-        createMedicalDrugTableFullInfo($medical_drug,$active_ingredients,$adverse_effects,$indications);            
+        createMedicalDrugTableFullInfo($medical_drug,$dosage[1],$active_ingredients[1],$adverse_effects[1],$indications[1]);            
         }
 
     }
-       
-}
-function createMedicalDrugTableFullInfo($medical_drug,$active_ingredients,$adverse_effects,$indications){
- echo '<table width="100%" CELLPADDING="4" CELLSPACING="3" id="container" class="table table-hover table-bordered">' ;
- echo '<thead>';
- echo '<tr>';
- echo '<th style="font-size:25px">'.$medical_drug.'</th>';
- echo '</tr>';
- echo '</thead>';
- echo '<tbody>';
- 
- echo '<td>';
- echo '<table width="100%" CELLPADDING="4" CELLSPACING="3" id="container" class="table table-hover table-bordered">';
- echo '<thead>';
- echo '<tr><th>Virkemiddel</th></tr>';
- foreach($active_ingredients as $active_ingredient)
-     echo '<tr><td>'.$active_ingredient.'</td></tr>';
- echo '</thead>';
- echo '</table>';
- echo '</td>';
-
- echo '<td>';
- echo '<table width="100%" CELLPADDING="4" CELLSPACING="3" id="container" class="table table-hover table-bordered">';
- echo '<thead>';
- echo '<tr><th>Bivirkninger</th></tr>';
- echo '</thead>';
- echo '<tbody>';
- foreach($adverse_effects as $adverse_effect)
-     echo '<tr><td>'.$adverse_effect.'</td></tr>';
- echo '</tbody>';
- echo '</table>';
- echo '</td>';
-
- echo '<td>';
- echo '<table width="100%" CELLPADDING="4" CELLSPACING="3" id="container" class="table table-hover table-bordered">';
- echo '<thead>';
- echo '<tr><th>Indikasjoner</th></tr>';
- foreach($indications as $indication)
-     echo '<tr><td>'.$indication.'</td></tr>';
- echo '</thead>';
- echo '</table>';
- echo '</td>';
- echo '</tbody>';
- echo '</table>';
+    
 }
 
 function createOverLappingAdverseEffect($medical_drugs,$sparql){
     /* Check overlap of every combination of the drugs*/
+    if(count($medical_drugs)>1){
+        echo '<table width="100%" CELLPADDING="4" CELLSPACING="3" id="container" class="table table-hover table-bordered">' ;
+        echo '<thead>';
+        echo '<tr>';
+        echo '<th>Legemiddel</th>';
+        echo '<th>Legemiddel</th>';
+        echo '<th>Overlappende bivirkning</th>';
+        echo '</tr>';
+        echo '</thead>';
+        for($i=0;$i<count($medical_drugs)-1;$i++){
+            for($j=$i+1;$j<count($medical_drugs);$j++){
+                $query = "SELECT * WHERE {                                              
+   {select ?bi_label where{                                                         
+   ?s rdfs:label ?med_label .                                                       
+   filter (lcase(str(?med_label)) = lcase(str('$medical_drugs[$i]'))) .             
+   ?s lmh:harVirkemiddel ?virkemiddel .                                             
+   ?virkemiddel lmh:harBivirkning ?bi .                                             
+         ?bi rdfs:label ?bi_label }}                                                
+   .                                                                                
+   {select ?bi_label where{                                                         
+   ?s rdfs:label ?med_label .                    
+filter (lcase(str(?med_label)) = lcase(str('$medical_drugs[$j]'))) .             
+   ?s lmh:harVirkemiddel ?virkemiddel .                                             
+   ?virkemiddel lmh:harBivirkning ?bi .                                             
+         ?bi rdfs:label ?bi_label }}                                                
+}";
+                $result = $sparql->query($query);
+                foreach($result as $row){
+                    $overlapping_adverse_effect = $row->bi_label;
+                    createOverlappingAdversesTable($medical_drugs[$i],$medical_drugs[$j],$overlapping_adverse_effect);
+                }
+            }
+        }
+        echo "</table>";
+        
+    }else{
+        echo '<font color="red">Det trengs minst to legemiddler for å avgjøre overlappende bivirkninger</font>';
+        
+    }
+}
+
+function createOverLappingActiveIngredients($medical_drugs,$sparql){
+    if(count($medical_drugs)<=1){
+            echo '<font color="red">Det trengs minst to legemiddler for å avgjøre overlappende virkemiddel</font>';
+
+        }else{
     echo '<table width="100%" CELLPADDING="4" CELLSPACING="3" id="container" class="table table-hover table-bordered">' ;
     echo '<thead>';
     echo '<tr>';
     echo '<th>Legemiddel</th>';
     echo '<th>Legemiddel</th>';
-    echo '<th>Overlapp</th>';
+    echo '<th>Overlappende virkestoff</th>';
     echo '</tr>';
     echo '</thead>';
-
-    for($i=0;$i<count($medical_drugs)-1;$i++){
+    for($i = 0;$i<count($medical_drugs)-1;$i++){
         for($j=$i+1;$j<count($medical_drugs);$j++){
-            $query = 'SELECT * WHERE {
-   {select ?bi_label where{
-   ?s rdfs:label ?med_label .
-   filter (lcase(str(?med_label)) = lcase(str("'.$medical_drugs[$i].'"))) .
-   ?s lmh:harVirkemiddel ?virkemiddel . 
-   ?virkemiddel lmh:harBivirkning ?bi .
-         ?bi rdfs:label ?bi_label }}
+            
+            $query = "
+select * where {
+{select ?virkestoff_label where{
+         ?s rdfs:label ?med_label .
+         filter (lcase(str(?med_label)) = lcase(str('$medical_drugs[$i]'))) .
+         ?s lmh:harVirkemiddel ?virkemiddel . 
+         ?virkemiddel rdfs:label ?virkestoff_label }}
    . 
-   {select ?bi_label where{
-   ?s rdfs:label ?med_label .
-   filter (lcase(str(?med_label)) = lcase(str("'.$medical_drugs[$j].'"))) .
-   ?s lmh:harVirkemiddel ?virkemiddel . 
-   ?virkemiddel lmh:harBivirkning ?bi .
-         ?bi rdfs:label ?bi_label }}
-}';
-            $result = $sparql->query($query);
-            foreach($result as $row){
-                $overlapping_adverse_effect = $row->bi_label;
-                createOverlappingAdversesTable($medical_drugs[$i],$medical_drugs[$j],$overlapping_adverse_effect);
-            }
+   {select ?virkestoff_label where{
+         ?s rdfs:label ?med_label .
+         filter (lcase(str(?med_label)) = lcase(str('$medical_drugs[$j]'))) .
+         ?s lmh:harVirkemiddel ?virkemiddel . 
+         ?virkemiddel rdfs:label ?virkestoff_label }}
+}";
+             $result = $sparql->query($query);
+             foreach($result as $row){
+                 createOverlappingActiveIngredientsTable($medical_drugs[$i],$medical_drugs[$j],$row->virkestoff_label);
+             }
         }
     }
-    echo "</table>";
+    
+    
+    echo '</table>';
+    }
 }
 
-function createOverlappingAdversesTable($first_drug,$second_drug,$overlap){
- echo '<tbody>';
- echo '<tr><td>'.$first_drug.'</td><td>'.$second_drug.'</td><td>'.$overlap.'</td></tr>';
- echo '</tbody>';
+function createCounteractingEffects($medical_drugs,$sparql){
+    if(count($medical_drugs)<=1){
+        echo '<font color="red">Det trengs minst to legemiddler for å avgjøre motvirkende effekter</font>';
+        
+    }else{
+        echo '<table width="100%" CELLPADDING="4" CELLSPACING="3" id="container" class="table table-hover table-bordered">' ;
+        for($i = 0;$i<count($medical_drugs);$i++){
+            
+            for($j = 0;$j<count($medical_drugs);$j++){
+                if($medical_drugs[$i] !== $medical_drugs[$j]){ //Not the same drug
+                    $query = "
+SELECT * WHERE {
+   
+   {select ?overlapping where{
+         ?s rdfs:label ?med_label .
+         filter (lcase(str(?med_label)) = lcase(str('$medical_drugs[$i]'))) .
+         ?s lmh:harVirkemiddel ?virkemiddel . 
+         ?virkemiddel lmh:harBivirkning ?bi .
+         ?bi rdfs:label ?overlapping .
+      }}
+   .
+   {select ?overlapping where{
+         ?s rdfs:label ?med_label .
+         filter (lcase(str(?med_label)) = lcase(str('$medical_drugs[$j]'))) .
+         ?s lmh:harVirkemiddel ?virkemiddel . 
+         ?virkemiddel lmh:harIndikasjon ?indi .
+         ?indi rdfs:label ?overlapping.
+      }}
 }
+                       ";
+                    $result = $sparql->query($query);
+                    foreach($result as $row){
+                        createCounteractingEffectsTable($medical_drugs[$i],$medical_drugs[$j],$row->overlapping);
+                        
+                    }
+                }
+            }
+        }
+        
+        echo '</table>';
+    }
+}
+
+
 
 function getActiveIngredients($medical_drug,$sparql){
-                $active_ingredients = array();
-                $query = 'SELECT ?virkestoff_label WHERE {
+        $active_ingredients = array();
+        $query = "SELECT ?virkestoff_label WHERE {
    ?s rdfs:label ?med_label .
-   filter (lcase(str(?med_label)) = lcase(str("'.$medical_drug.'"))) .
+   filter (lcase(str(?med_label)) = lcase(str('$medical_drug'))) .
    ?s lmh:harVirkemiddel ?virkemiddel . 
    ?virkemiddel rdfs:label ?virkestoff_label
-} ';
-                $result = $sparql->query($query);
-                foreach($result as $row){
-                    array_push($active_ingredients,$row->virkestoff_label);
-                }
-                
-                return $active_ingredients;
+} ";
+        $result = $sparql->query($query);
+        foreach($result as $row){
+            array_push($active_ingredients,$row->virkestoff_label);
+        }
+        
+        return [$query,$active_ingredients];
 }
 
 function getAdverseEffects($medical_drug,$sparql){
     $adverse_effects = array();
-    $query = 'SELECT ?bi_label WHERE {
+    $query = "SELECT ?bi_label WHERE {
    ?s rdfs:label ?med_label .
-   filter (lcase(str(?med_label)) = lcase(str("'.$medical_drug.'"))) .
+   filter (lcase(str(?med_label)) = lcase(str('$medical_drug'))) .
    ?s lmh:harVirkemiddel ?virkemiddel . 
    ?virkemiddel lmh:harBivirkning ?bi .
    ?bi rdfs:label ?bi_label 
-} ';
+} ";
     $result = $sparql->query($query);
     foreach($result as $row){
         array_push($adverse_effects,$row->bi_label);          
     }
     
-    return $adverse_effects;
+    return [$query,$adverse_effects];
 }
 
 
 function getIndications($medical_drug,$sparql){
     $indications = array();
-    $query = 'SELECT ?indikasjon_label WHERE {
+    $query = "SELECT ?indikasjon_label WHERE {
    ?s rdfs:label ?med_label .
-   filter (lcase(str(?med_label)) = lcase(str("'.$medical_drug.'"))) .
+   filter (lcase(str(?med_label)) = lcase(str('$medical_drug'))) .
    ?s lmh:harVirkemiddel ?virkemiddel . 
    ?virkemiddel lmh:harIndikasjon ?indikasjon . 
    ?indikasjon rdfs:label ?indikasjon_label 
-} ';
+} ";
     $result = $sparql->query($query);
     foreach($result as $row){
         array_push($indications,$row->indikasjon_label);
     }
     
-    return $indications;
+    return [$query,$indications];
+}
+
+function getDosages($medical_drug,$sparql){
+    $dosage = array();
+    $query = "
+SELECT distinct ?d_label WHERE{
+   ?s ?p ?o . 
+   ?s rdfs:label ?sl .
+   filter(lcase(str(?sl)) = lcase(str('$medical_drug'))) .
+   ?s lmh:harDosering ?asd .
+   ?asd rdfs:label ?d_label
+            
+}";
+    $result = $sparql->query($query);
+    foreach($result as $row){
+        array_push($dosage,$row->d_label);
+    }
+    return [$query,$dosage];
 }
