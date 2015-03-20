@@ -1,4 +1,4 @@
-B1;2802;0c<?php
+<?php
 require("pille_query.php");
 require("pille_buildtables.php");
 
@@ -76,9 +76,10 @@ function createFullInformation($medical_drugs,$sparql){
         /* Create the table*/
         createMedicalDrugTableFullInfo($medical_drug,$dosage[1],$active_ingredients[1],$adverse_effects[1],$indications[1]);            
         }
-    createExportJSONButton($medical_drugs_json);
+
 
     }
+    createExportJSONButton($medical_drugs_json);
     
 }
 
@@ -93,6 +94,7 @@ function createOverLappingAdverseEffect($medical_drugs,$sparql){
         echo '<th>Overlappende bivirkning</th>';
         echo '</tr>';
         echo '</thead>';
+        $overlappings_json = array();
         for($i=0;$i<count($medical_drugs)-1;$i++){
             for($j=$i+1;$j<count($medical_drugs);$j++){
                 $query = "SELECT * WHERE {                                              
@@ -113,10 +115,13 @@ filter (lcase(str(?med_label)) = lcase(str('$medical_drugs[$j]'))) .
                 $result = $sparql->query($query);
                 foreach($result as $row){
                     $overlapping_adverse_effect = $row->bi_label;
+                    array_push($overlappings_json,["bivirkning" => $row->bi_label,
+                                                   "legemiddler" => [$medical_drugs[$i],$medical_drugs[$j]]]);
                     createOverlappingAdversesTable($medical_drugs[$i],$medical_drugs[$j],$overlapping_adverse_effect);
                 }
             }
         }
+        createExportJSONButton($overlappings_json);
         echo "</table>";
         
     }else{
@@ -138,6 +143,7 @@ function createOverLappingActiveIngredients($medical_drugs,$sparql){
     echo '<th>Overlappende virkestoff</th>';
     echo '</tr>';
     echo '</thead>';
+    $overlappings_json = array();
     for($i = 0;$i<count($medical_drugs)-1;$i++){
         for($j=$i+1;$j<count($medical_drugs);$j++){
             
@@ -157,12 +163,13 @@ select * where {
 }";
              $result = $sparql->query($query);
              foreach($result as $row){
+                 array_push($overlappings_json,["overlappende virkestoff" => $row->virkestoff_label, "legemiddler" => [$medical_drugs[$i],$medical_drugs[$j]]]);
                  createOverlappingActiveIngredientsTable($medical_drugs[$i],$medical_drugs[$j],$row->virkestoff_label);
              }
         }
     }
     
-    
+    createExportJSONButton($overlappings_json);
     echo '</table>';
     }
 }
@@ -173,6 +180,7 @@ function createCounteractingEffects($medical_drugs,$sparql){
         
     }else{
         echo '<table width="100%" id="container" class="table">' ;
+        $counteracting_json = array();
         for($i = 0;$i<count($medical_drugs);$i++){
             
             for($j = 0;$j<count($medical_drugs);$j++){
@@ -199,13 +207,16 @@ SELECT * WHERE {
                        ";
                     $result = $sparql->query($query);
                     foreach($result as $row){
+                        array_push($counteracting_json,
+                                   ["effekt" => $row->overlapping,
+                                    "legemiddel" => [$medical_drugs[$i],$medical_drugs[$j]]]);
                         createCounteractingEffectsTable($medical_drugs[$i],$medical_drugs[$j],$row->overlapping);
                         
                     }
                 }
             }
         }
-        
+        createExportJSONButton($counteracting_json);
         echo '</table>';
     }
 }

@@ -10,12 +10,13 @@ $medical_drugs = getMedicalDrugsFromSearchBar();
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
         <link rel="stylesheet" href="style/standard.css">
-    </head>
+<title>HAFE - Informasjon om legemidler</title> 
+</head>
     <body>
         <div class="jumbotron" id="header">
-            <h1>HAFE</h1> 
-            <p>Informasjon om legemidler!</p> 
-        </div>
+            <img src="resources/img/HAFE_3_T_02.png" width="22%" height="10%"> 
+            <p>Informasjon om legemidler!</p>
+</div>
         <div class="container-fluid">
           <form name="medicaldrug_search" method="POST" action="" role="form">
            <div class="form-group ">
