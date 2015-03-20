@@ -6,3 +6,7 @@
 #button-style {
     float: right;
 }
+
+#outer-table {
+    border: 0px;
+}

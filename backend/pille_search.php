@@ -1,4 +1,4 @@
-<?php
+B1;2802;0c<?php
 require("pille_query.php");
 require("pille_buildtables.php");
 
@@ -38,6 +38,7 @@ function createMedicalViz($medical_drugs){
        full = full information
        overlapp_bi = overlapping adverse effects
     */
+    if($_POST["view"]){
     $view = $_POST["view"];
         if($view == "full"){
             createFullInformation($medical_drugs,new pille_query());
@@ -48,10 +49,12 @@ function createMedicalViz($medical_drugs){
         }elseif($view == "counteracting_effects"){
             createCounteractingEffects($medical_drugs,new pille_query());
         }
+    }
 }
  
 function createFullInformation($medical_drugs,$sparql){
     $medical_drugs_not_found = array();
+    $medical_drugs_json=array();
     foreach($medical_drugs as $medical_drug){
         //Active Ingredients
         $active_ingredients = getActiveIngredients($medical_drug,$sparql);
@@ -64,10 +67,16 @@ function createFullInformation($medical_drugs,$sparql){
         $dosage = getDosages($medical_drug,$sparql);
         /* Create Export to JSON form */
         $queries = [$active_ingredients[0],$adverse_effects[0],$indications[0]];
-        createExportJSONButton($queries);
+        /* Update the json array*/
+        array_push($medical_drugs_json,["legemiddel" =>$medical_drug,
+                                        "doseringer" => $dosage[1]
+                                        ,"virkemiddler" => $active_ingredients[1]
+                                        ,"bivirkninger" => $adverse_effects[1]
+                                        , "indikasjoner" => $indications[1]]);
         /* Create the table*/
         createMedicalDrugTableFullInfo($medical_drug,$dosage[1],$active_ingredients[1],$adverse_effects[1],$indications[1]);            
         }
+    createExportJSONButton($medical_drugs_json);
 
     }
     
@@ -76,9 +85,9 @@ function createFullInformation($medical_drugs,$sparql){
 function createOverLappingAdverseEffect($medical_drugs,$sparql){
     /* Check overlap of every combination of the drugs*/
     if(count($medical_drugs)>1){
-        echo '<table width="100%" CELLPADDING="4" CELLSPACING="3" id="container" class="table table-hover table-bordered">' ;
+        echo '<table width="100%" id="container" class="table">' ;
         echo '<thead>';
-        echo '<tr>';
+        echo '<tr class="info">';
         echo '<th>Legemiddel</th>';
         echo '<th>Legemiddel</th>';
         echo '<th>Overlappende bivirkning</th>';
@@ -121,7 +130,7 @@ function createOverLappingActiveIngredients($medical_drugs,$sparql){
             echo '<font color="red">Det trengs minst to legemiddler for å avgjøre overlappende virkemiddel</font>';
 
         }else{
-    echo '<table width="100%" CELLPADDING="4" CELLSPACING="3" id="container" class="table table-hover table-bordered">' ;
+    echo '<table width="100%" id="container" class="table">' ;
     echo '<thead>';
     echo '<tr>';
     echo '<th>Legemiddel</th>';
@@ -163,7 +172,7 @@ function createCounteractingEffects($medical_drugs,$sparql){
         echo '<font color="red">Det trengs minst to legemiddler for å avgjøre motvirkende effekter</font>';
         
     }else{
-        echo '<table width="100%" CELLPADDING="4" CELLSPACING="3" id="container" class="table table-hover table-bordered">' ;
+        echo '<table width="100%" id="container" class="table">' ;
         for($i = 0;$i<count($medical_drugs);$i++){
             
             for($j = 0;$j<count($medical_drugs);$j++){
