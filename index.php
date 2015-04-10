@@ -14,14 +14,14 @@ $medical_drugs = getMedicalDrugsFromSearchBar();
 </head>
     <body>
         <div class="jumbotron" id="header">
-            <img src="resources/img/HAFE_3_T_02.png" width="22%" height="10%"> 
+            <img src="resources/img/HAFE_3_T_02.png" width="22%" height="8%"> 
             <p>Informasjon om legemidler!</p>
 </div>
         <div class="container-fluid">
           <form name="medicaldrug_search" method="POST" action="" role="form">
            <div class="form-group ">
                <div class="col-sm-3">
-    <input type="text" name="medical_drugs" placeholder="Leggemiddel" class="form-control"
+    <input type="text" name="medical_drugs" placeholder="Legemiddel" class="form-control"
     value="<?php 
 $string="";
 foreach($medical_drugs as $medical_drug) {
